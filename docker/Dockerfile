@@ -3,8 +3,8 @@
 FROM rockylinux:9.1 AS base
 ENV TROUTE_REPO=CIROH-UA/t-route
 ENV TROUTE_BRANCH=ngiab
-ENV NGEN_REPO=CIROH-UA/ngen
-ENV NGEN_BRANCH=ngiab
+ENV NGEN_REPO=RTIInternational/ngen
+ENV NGEN_BRANCH=ngiab-modsim
 
 # Install final dependencies to make sure ngen is build and deployed with matching versions
 # Needed here for build caching
@@ -108,6 +108,7 @@ ARG COMMON_BUILD_ARGS="-DNGEN_WITH_EXTERN_ALL=ON \
     -DNGEN_WITH_BMI_FORTRAN:BOOL=ON \
     -DNGEN_WITH_PYTHON:BOOL=ON \
     -DNGEN_WITH_ROUTING:BOOL=ON \
+    -DNGEN_WITH_ROUTING_MODSIM:BOOL=ON \
     -DNGEN_WITH_SQLITE:BOOL=ON \
     -DNGEN_WITH_UDUNITS:BOOL=ON \
     -DUDUNITS_QUIET:BOOL=ON \
@@ -120,7 +121,7 @@ ARG COMMON_BUILD_ARGS="-DNGEN_WITH_EXTERN_ALL=ON \
 
 # Build Ngen serial
 RUN cmake -G Ninja -B cmake_build_serial -S . ${COMMON_BUILD_ARGS} -DNGEN_WITH_MPI:BOOL=OFF && \
-    cmake --build cmake_build_serial --target all -- -j $(nproc)
+    cmake --build cmake_build_serial --target all -- -j 2
 
 ARG MPI_BUILD_ARGS="-DNGEN_WITH_MPI:BOOL=ON \
     -DNetCDF_ROOT=/usr/lib64/mpich \
@@ -134,7 +135,7 @@ RUN dnf install -y netcdf-cxx4-mpich-devel
 RUN cmake -G Ninja -B cmake_build_parallel -S . ${COMMON_BUILD_ARGS} ${MPI_BUILD_ARGS} \
     -DNetCDF_CXX_INCLUDE_DIR=/usr/include/mpich-$(arch) \
     -DNetCDF_INCLUDE_DIR=/usr/include/mpich-$(arch) && \
-    cmake --build cmake_build_parallel --target all -- -j $(nproc)
+    cmake --build cmake_build_parallel --target all -- -j 2
 
 
 
@@ -208,6 +209,8 @@ RUN cargo build --release
 
 
 FROM base AS final
+RUN dnf install -y git mono-complete && dnf clean all
+ENV UDUNITS2_XML_PATH=/usr/share/udunits/udunits2.xml
 ARG pinned_python_packages="netCDF4==1.6.3 pydantic<2 pandas<3"
 WORKDIR /ngen
 
@@ -264,6 +267,25 @@ RUN mkdir -p /ngen/ngen/extern/dhbv2/ngen_resources/data/dhbv_2_mts/model/ \
         | tar -xz -C /ngen/ngen/extern/dhbv2/ngen_resources/data/dhbv_2_mts/model/ --strip-components=1 && \
     curl -fsSL https://mhpi-spatial.s3.us-east-2.amazonaws.com/mhpi-release/models/owp/dhbv_2.tar.gz \
         | tar -xz -C /ngen/ngen/extern/dhbv2/ngen_resources/data/dhbv_2/model/ --strip-components=1
+
+
+
+ARG PYMODSIM_REPO=RTIInternational/py-modsim
+ARG PYMODSIM_REF=ngen-integration
+
+RUN --mount=type=secret,id=pymodsim_token,required=false \
+        if [ -f /run/secrets/pymodsim_token ]; then \
+            PYMODSIM_TOKEN="$(cat /run/secrets/pymodsim_token)" && \
+            git clone --depth 1 --single-branch --branch ${PYMODSIM_REF} \
+            "https://x-access-token:${PYMODSIM_TOKEN}@github.com/${PYMODSIM_REPO}.git" /tmp/py-modsim ; \
+        else \
+            git clone --depth 1 --single-branch --branch ${PYMODSIM_REF} \
+            "https://github.com/${PYMODSIM_REPO}.git" /tmp/py-modsim ; \
+        fi \
+        && uv pip install /tmp/py-modsim \
+        && uv pip install /tmp/py-modsim/src/modsim-ngen \
+        && python3.11 -c "import pymodsim; import modsim_ngen.main"
+
 
 ## add some metadata to the image
 COPY --from=troute_build /tmp/troute_url /ngen/troute_url
