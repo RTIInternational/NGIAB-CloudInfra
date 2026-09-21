@@ -285,8 +285,11 @@ RUN mkdir -p /ngen/ngen/extern/dhbv2/ngen_resources/data/dhbv_2_mts/model/ \
 
 ARG PYMODSIM_REPO=RTIInternational/py-modsim
 ARG PYMODSIM_REF=ngen-integration
+# Cache-busting marker for PYMODSIM_REF head updates.
+ARG PYMODSIM_SHA=unknown
 
 RUN --mount=type=secret,id=pymodsim_token,required=false \
+        echo "Building py-modsim from ${PYMODSIM_REPO}@${PYMODSIM_REF} (${PYMODSIM_SHA})" && \
         if [ -f /run/secrets/pymodsim_token ]; then \
             PYMODSIM_TOKEN="$(cat /run/secrets/pymodsim_token)" && \
             git clone --depth 1 --single-branch --branch ${PYMODSIM_REF} \
@@ -297,6 +300,11 @@ RUN --mount=type=secret,id=pymodsim_token,required=false \
         fi \
         && uv pip install /tmp/py-modsim \
         && uv pip install /tmp/py-modsim/src/modsim-ngen \
+        && chmod +x /ngen/.venv/lib/python3.11/site-packages/pymodsim/dlls/libSQLite.Interop.so \
+        && rm /ngen/.venv/lib/python3.11/site-packages/pymodsim/dlls/x64/SQLite.Interop.dll \
+        && ln -s ../libSQLite.Interop.so /ngen/.venv/lib/python3.11/site-packages/pymodsim/dlls/x64/SQLite.Interop.dll \
+        && echo "/ngen/.venv/lib/python3.11/site-packages/pymodsim/dlls" > /etc/ld.so.conf.d/pymodsim.conf && ldconfig \
+        && python3.11 -c "import os; os.environ.setdefault('PYTHONNET_RUNTIME', 'mono'); import clr; clr.AddReference('/ngen/.venv/lib/python3.11/site-packages/pymodsim/dlls/System.Data.SQLite'); from System.Data.SQLite import SQLiteConnection; import tempfile; tmpdb = os.path.join(tempfile.gettempdir(), 'test.db'); conn = SQLiteConnection(f'Data Source={tmpdb};'); conn.Open(); cmd = conn.CreateCommand(); cmd.CommandText = 'SELECT sqlite_version()'; result = cmd.ExecuteScalar(); conn.Close(); os.remove(tmpdb); print(f'SQLite native interop test PASSED: {result}')" \
         && python3.11 -c "import pymodsim; import modsim_ngen.main"
 
 
