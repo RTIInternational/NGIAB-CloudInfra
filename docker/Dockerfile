@@ -222,7 +222,8 @@ RUN cargo build --release
 
 
 FROM base AS final
-RUN dnf install -y git mono-complete && dnf clean all
+RUN dnf install -y git mono-complete dotnet-runtime-8.0 && dnf clean all
+ENV DOTNET_ROOT=/usr/lib64/dotnet
 ENV UDUNITS2_XML_PATH=/usr/share/udunits/udunits2.xml
 ARG pinned_python_packages="netCDF4==1.6.3 pydantic<2 pandas<3"
 WORKDIR /ngen
@@ -284,7 +285,7 @@ RUN mkdir -p /ngen/ngen/extern/dhbv2/ngen_resources/data/dhbv_2_mts/model/ \
 
 
 ARG PYMODSIM_REPO=RTIInternational/py-modsim
-ARG PYMODSIM_REF=ngen-integration
+ARG PYMODSIM_REF=ngen-integration-linux
 
 RUN --mount=type=secret,id=pymodsim_token,required=false \
         if [ -f /run/secrets/pymodsim_token ]; then \
