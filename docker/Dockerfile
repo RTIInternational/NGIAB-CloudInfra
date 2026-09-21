@@ -178,6 +178,7 @@ RUN mkdir -p /dmod/datasets /dmod/datasets/static /dmod/shared_libs /dmod/bin /d
     shopt -s globstar && \
     cp -a ./extern/**/cmake_build/*.so* /dmod/shared_libs/. || true && \
     cp -a ./extern/noah-owp-modular/**/*.TBL /dmod/datasets/static && \
+    cp -a ./extern/lgar-c/LGAR-C/data/vG_default_params.dat /dmod/datasets/static && \
     cp -a ./cmake_build_parallel/ngen /dmod/bin/ngen-parallel || true && \
     cp -a ./cmake_build_serial/ngen /dmod/bin/ngen-serial || true && \
     cp -a ./cmake_build_parallel/partitionGenerator /dmod/bin/partitionGenerator || true && \
@@ -274,13 +275,13 @@ RUN echo "/sundials/lib64" >> /etc/ld.so.conf.d/sundials.conf && ldconfig -v
 
 # Install dhbv
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv pip install "dmg==1.4.0" "hydrodl2==1.3.5" "dhbv2==0.5.3" --extra-index-url https://download.pytorch.org/whl/cpu
-RUN mkdir -p /ngen/ngen/extern/dhbv2/ngen_resources/data/dhbv_2_mts/model/ \
-             /ngen/ngen/extern/dhbv2/ngen_resources/data/dhbv_2/model/ && \
+    uv pip install "dmg==1.4.3" "hydrodl2==1.3.5" "dhbv2==0.5.4" --extra-index-url https://download.pytorch.org/whl/cpu
+RUN mkdir -p /ngen/ngen/extern/dhbv2/ngen_resources/data/dhbv_2_mts/model/dhbv_2_mts/ \
+            /ngen/ngen/extern/dhbv2/ngen_resources/data/dhbv_2/model/dhbv_2/ && \
     curl -fsSL https://mhpi-spatial.s3.us-east-2.amazonaws.com/mhpi-release/models/owp/dhbv_2_mts.tar.gz \
-        | tar -xz -C /ngen/ngen/extern/dhbv2/ngen_resources/data/dhbv_2_mts/model/ --strip-components=1 && \
+        | tar -xz -C /ngen/ngen/extern/dhbv2/ngen_resources/data/dhbv_2_mts/model/dhbv_2_mts/ --strip-components=1 && \
     curl -fsSL https://mhpi-spatial.s3.us-east-2.amazonaws.com/mhpi-release/models/owp/dhbv_2.tar.gz \
-        | tar -xz -C /ngen/ngen/extern/dhbv2/ngen_resources/data/dhbv_2/model/ --strip-components=1
+        | tar -xz -C /ngen/ngen/extern/dhbv2/ngen_resources/data/dhbv_2/model/dhbv_2/ --strip-components=1
 
 
 
